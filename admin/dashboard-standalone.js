@@ -353,6 +353,38 @@
     } catch (error) { content.innerHTML = `<h1>${title}</h1>${notice(error.message, true)}`; }
   }
 
+  function orderState(value) {
+    const state = String(value || 'Da confermare').toLowerCase();
+    if (state === 'approvato' || state === 'confermato') return 'Approvato';
+    if (state === 'annullato') return 'Annullato';
+    if (state === 'completato') return 'Completato';
+    if (state === 'in lavorazione') return 'In lavorazione';
+    return 'Da confermare';
+  }
+
+  async function updateOrderStatus(order, status) {
+    const action = status === 'Approvato' ? 'confermare' : 'annullare';
+    if (!confirm(`Vuoi ${action} l'ordine ${order.order_number || ''}?`)) return;
+    try {
+      await api('rpc/set_order_status', { method: 'POST', body: JSON.stringify({ p_order_id: order.id, p_status: status }) });
+      ordersPage();
+    } catch (error) { alert(`Non e stato possibile aggiornare l'ordine: ${error.message}`); }
+  }
+
+  async function ordersPage() {
+    content.innerHTML = '<h1>Ordini</h1><p class="muted">Caricamento ordini...</p>';
+    try {
+      const orders = await api('orders?select=*&order=created_at.desc');
+      content.innerHTML = `<h1>Ordini</h1><div class="list">${orders.length ? orders.map(order => {
+        const state = orderState(order.status);
+        const pending = state === 'Da confermare';
+        return `<div class="row order-row"><span>✓</span><span><strong>Ordine ${escapeHtml(order.order_number || '#')}</strong><p>${escapeHtml(order.customer_name || order.customer_email || '')} · ${date(order.created_at)} · <b class="status ${state === 'Annullato' ? 'status-cancelled' : ''}">${state}</b></p></span><span class="order-actions"><b>${money(order.total)}</b>${pending ? `<span><button class="confirm-order" data-order-id="${escapeHtml(order.id)}">Conferma</button><button class="ghost cancel-order" data-order-id="${escapeHtml(order.id)}">Annulla</button></span>` : ''}</span></div>`;
+      }).join('') : '<p class="empty">Non ci sono ancora ordini.</p>'}</div>`;
+      content.querySelectorAll('.confirm-order').forEach(button => button.addEventListener('click', () => updateOrderStatus(orders.find(order => order.id === button.dataset.orderId), 'Approvato')));
+      content.querySelectorAll('.cancel-order').forEach(button => button.addEventListener('click', () => updateOrderStatus(orders.find(order => order.id === button.dataset.orderId), 'Annullato')));
+    } catch (error) { content.innerHTML = `<h1>Ordini</h1>${notice(error.message, true)}`; }
+  }
+
   function go(page) {
     navigation(page);
     if (page === 'home') return homePage();
@@ -360,9 +392,9 @@
     if (page === 'links') return linksPage();
     if (page === 'customers') return customersPage();
     if (page === 'coupons') return couponsPage();
+    if (page === 'orders') return ordersPage();
     const configs = {
       links: ['store_settings', 'Link di vendita', item => `<div class="row"><span>⌁</span><span><strong>${escapeHtml(item.store_name || 'Il Gatto di Cruci')}</strong><p>Link pubblico del negozio</p></span><b>Attivo</b></div>`],
-      orders: ['orders', 'Ordini', item => `<div class="row"><span>✓</span><span><strong>Ordine ${escapeHtml(item.order_number || '#')}</strong><p>${escapeHtml(item.customer_name || item.customer_email || '')} · ${date(item.created_at)} · ${escapeHtml(item.status || 'Da confermare')}</p></span><b>${money(item.total)}</b></div>`],
     };
     if (configs[page]) return simpleList(page, ...configs[page]);
     const messages = {
