@@ -295,10 +295,18 @@
     document.querySelector('#delete-link').addEventListener('click', async () => { if (!confirm(`Eliminare il link ${link.title}?`)) return; try { await api(`sale_links?id=eq.${encodeURIComponent(link.id)}`, { method: 'DELETE' }); linksPage(); } catch (error) { alert(error.message); } });
   }
 
+  function customerDetail(customer, orders) {
+    navigation('customers');
+    const history = orders.filter(order => (order.customer_email || '').trim().toLowerCase() === customer.email).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const total = history.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    content.innerHTML = `<button class="back" id="back-customers">← Clienti</button><h1>${escapeHtml(customer.name || customer.email)}</h1><p class="muted">${escapeHtml(customer.email)}</p><section class="stats"><div class="stat">Ordini<b>${history.length}</b></div><div class="stat">Totale acquistato<b>${money(total)}</b></div></section><h2>Storico ordini</h2><div class="list">${history.map(order => `<div class="row"><span>✓</span><span><strong>Ordine ${escapeHtml(order.order_number || '#')}</strong><p>${date(order.created_at)} · ${escapeHtml(order.shipping_method || 'Spedizione da definire')} · <b class="status ${orderState(order.status) === 'Annullato' ? 'status-cancelled' : ''}">${orderState(order.status)}</b></p></span><b>${money(order.total)}</b></div>`).join('') || '<p class="empty">Questo cliente non ha ancora ordini.</p>'}</div>`;
+    document.querySelector('#back-customers').addEventListener('click', customersPage);
+  }
+
   async function customersPage() {
     content.innerHTML = '<h1>Clienti</h1><p class="muted">Caricamento clienti...</p>';
     try {
-      const orders = await api('orders?select=customer_name,customer_email,created_at,total&order=created_at.desc');
+      const orders = await api('orders?select=*&order=created_at.desc');
       const customers = new Map();
       orders.forEach(order => {
         const email = (order.customer_email || '').trim().toLowerCase();
@@ -309,7 +317,12 @@
       });
       const values = [...customers.values()];
       content.innerHTML = `<div class="top"><h1>Clienti</h1></div><input id="customer-search" class="search" placeholder="Cerca cliente..."><p class="muted">Tutti · ${values.length}</p><div class="list" id="customer-list"></div>`;
-      const draw = term => { document.querySelector('#customer-list').innerHTML = values.filter(customer => `${customer.name} ${customer.email}`.toLowerCase().includes(term.toLowerCase())).map(customer => `<div class="row"><span>Cliente</span><span><strong>${escapeHtml(customer.name || customer.email)}</strong><p>${escapeHtml(customer.email)} · ${customer.count} ordini</p></span><b>${money(customer.total)}</b></div>`).join('') || '<p class="empty">Non ci sono ancora clienti con ordini.</p>'; };
+      const draw = term => {
+        const list = document.querySelector('#customer-list');
+        const filtered = values.filter(customer => `${customer.name} ${customer.email}`.toLowerCase().includes(term.toLowerCase()));
+        list.innerHTML = filtered.map(customer => `<button class="customer-row" data-customer-email="${escapeHtml(customer.email)}"><span>Cliente</span><span><strong>${escapeHtml(customer.name || customer.email)}</strong><p>${escapeHtml(customer.email)} · ${customer.count} ordini</p></span><b>${money(customer.total)}</b></button>`).join('') || '<p class="empty">Non ci sono ancora clienti con ordini.</p>';
+        list.querySelectorAll('[data-customer-email]').forEach(row => row.addEventListener('click', () => customerDetail(values.find(customer => customer.email === row.dataset.customerEmail), orders)));
+      };
       document.querySelector('#customer-search').addEventListener('input', event => draw(event.target.value));
       draw('');
     } catch (error) { content.innerHTML = `<h1>Clienti</h1>${notice(error.message, true)}`; }
