@@ -26,12 +26,12 @@
         let updated = 0, created = 0;
         for (const item of inventory) {
           const candidates = buckets.get(norm(item.n)) || []; const current = candidates.shift();
-          const payload = { stock: item.s, available: item.s > 0, price: item.p };
+          const source = catalogue.find(product => norm(product.name) === norm(item.n));
+          const payload = { stock: item.s, available: item.s > 0, price: item.p, ...(Number.isInteger(source?.id) ? { legacy_id: source.id } : {}) };
           if (current) {
             const patch = await fetch(`https://${project}.supabase.co/rest/v1/products?id=eq.${encodeURIComponent(current.id)}`, { method: 'PATCH', headers, body: JSON.stringify(payload) });
             if (!patch.ok) throw new Error(`Errore aggiornando ${item.n}`); updated++;
           } else {
-            const source = catalogue.find(product => norm(product.name) === norm(item.n));
             const post = await fetch(`https://${project}.supabase.co/rest/v1/products`, { method: 'POST', headers, body: JSON.stringify({ ...payload, owner_id: session.user.id, name: item.n, description: source?.description || '', image_url: source?.image || '', variants: [] }) });
             if (!post.ok) throw new Error(`Errore creando ${item.n}`); created++;
           }
