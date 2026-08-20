@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: il-gatto-di-cruci
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
