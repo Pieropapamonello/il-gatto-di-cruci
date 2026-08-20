@@ -25,6 +25,47 @@
     ? product.variants.reduce((total, variant) => total + Number(variant.stock || 0), 0)
     : Number(product.stock || 0);
 
+  function duplicateProductGroups(products) {
+    const groups = new Map();
+    products.forEach(product => {
+      const key = `${String(product.name || '').trim().toLowerCase()}::${Number(product.price || 0).toFixed(2)}`;
+      groups.set(key, [...(groups.get(key) || []), product]);
+    });
+    return [...groups.values()].filter(group => group.length > 1);
+  }
+
+  function mergedVariants(group) {
+    const values = new Map();
+    group.forEach(product => (Array.isArray(product.variants) ? product.variants : []).forEach(variant => {
+      const name = String(variant.name || '').trim();
+      if (!name) return;
+      const previous = values.get(name) || 0;
+      values.set(name, previous + Math.max(0, Number(variant.stock || 0)));
+    }));
+    return [...values.entries()].map(([name, quantity]) => ({ name, stock: quantity, available: quantity > 0 }));
+  }
+
+  async function removeDuplicateProducts(groups) {
+    const names = groups.map(group => `${group[0].name} (${group.length} copie)`).join('\n');
+    if (!confirm(`Saranno uniti questi prodotti duplicati:\n\n${names}\n\nVerrà mantenuta una sola scheda per prodotto e le quantità saranno sommate. Continuare?`)) return;
+    try {
+      for (const group of groups) {
+        const ordered = [...group].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const keeper = ordered.find(product => product.legacy_id !== null && product.legacy_id !== undefined) || ordered[0];
+        const copies = ordered.filter(product => product.id !== keeper.id);
+        const variants = mergedVariants(group);
+        const totalStock = variants.length ? variants.reduce((sum, variant) => sum + variant.stock, 0) : group.reduce((sum, product) => sum + Math.max(0, Number(product.stock || 0)), 0);
+        await api(`products?id=eq.${encodeURIComponent(keeper.id)}`, {
+          method: 'PATCH', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ stock: totalStock, variants, available: group.some(product => product.available !== false) && totalStock > 0 }),
+        });
+        for (const copy of copies) await api(`products?id=eq.${encodeURIComponent(copy.id)}`, { method: 'DELETE' });
+      }
+      alert('Duplicati rimossi. Le quantità sono state conservate nella scheda rimasta.');
+      productsPage();
+    } catch (error) { alert(`Non è stato possibile completare la pulizia: ${error.message}`); }
+  }
+
   async function api(path, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
@@ -117,7 +158,8 @@
     content.innerHTML = '<div class="top"><h1>Prodotti</h1><button id="new-product">＋ Nuovo prodotto</button></div><p class="muted">Caricamento prodotti...</p>';
     try {
       productsCache = await api('products?select=*&order=created_at.desc');
-      content.innerHTML = `<div class="top"><h1>Prodotti</h1><button id="new-product">＋ Nuovo prodotto</button></div>
+      const duplicateGroups = duplicateProductGroups(productsCache);
+      content.innerHTML = `<div class="top"><h1>Prodotti</h1><span class="detail-actions">${duplicateGroups.length ? `<button class="ghost" id="clean-duplicates">Rimuovi duplicati (${duplicateGroups.length})</button>` : ''}<button id="new-product">＋ Nuovo prodotto</button></span></div>
         <input id="product-search" class="search" placeholder="Cerca..." autocomplete="off">
         <p id="products-count" class="muted"></p><div id="products-list" class="list"></div>`;
       const search = content.querySelector('#product-search');
@@ -130,6 +172,7 @@
         list.querySelectorAll('[data-product-id]').forEach(row => row.addEventListener('click', () => productDetail(productsCache.find(product => product.id === row.dataset.productId))));
       };
       content.querySelector('#new-product').addEventListener('click', () => productEditor());
+      content.querySelector('#clean-duplicates')?.addEventListener('click', () => removeDuplicateProducts(duplicateGroups));
       search.addEventListener('input', event => draw(event.target.value));
       draw('');
     } catch (error) { content.innerHTML = `<h1>Prodotti</h1>${notice(error.message, true)}`; }
