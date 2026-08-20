@@ -248,6 +248,26 @@
     document.querySelector('#delete-link').addEventListener('click', async () => { if (!confirm(`Eliminare il link ${link.title}?`)) return; try { await api(`sale_links?id=eq.${encodeURIComponent(link.id)}`, { method: 'DELETE' }); linksPage(); } catch (error) { alert(error.message); } });
   }
 
+  async function customersPage() {
+    content.innerHTML = '<h1>Clienti</h1><p class="muted">Caricamento clienti...</p>';
+    try {
+      const orders = await api('orders?select=customer_name,customer_email,created_at,total&order=created_at.desc');
+      const customers = new Map();
+      orders.forEach(order => {
+        const email = (order.customer_email || '').trim().toLowerCase();
+        if (!email) return;
+        const current = customers.get(email) || { email, name: order.customer_name || '', count: 0, total: 0 };
+        current.count += 1; current.total += Number(order.total || 0); if (!current.name && order.customer_name) current.name = order.customer_name;
+        customers.set(email, current);
+      });
+      const values = [...customers.values()];
+      content.innerHTML = `<div class="top"><h1>Clienti</h1></div><input id="customer-search" class="search" placeholder="Cerca cliente..."><p class="muted">Tutti · ${values.length}</p><div class="list" id="customer-list"></div>`;
+      const draw = term => { document.querySelector('#customer-list').innerHTML = values.filter(customer => `${customer.name} ${customer.email}`.toLowerCase().includes(term.toLowerCase())).map(customer => `<div class="row"><span>Cliente</span><span><strong>${escapeHtml(customer.name || customer.email)}</strong><p>${escapeHtml(customer.email)} · ${customer.count} ordini</p></span><b>${money(customer.total)}</b></div>`).join('') || '<p class="empty">Non ci sono ancora clienti con ordini.</p>'; };
+      document.querySelector('#customer-search').addEventListener('input', event => draw(event.target.value));
+      draw('');
+    } catch (error) { content.innerHTML = `<h1>Clienti</h1>${notice(error.message, true)}`; }
+  }
+
   async function simpleList(page, table, title, row) {
     content.innerHTML = `<h1>${title}</h1><p class="muted">Caricamento...</p>`;
     try {
@@ -261,10 +281,10 @@
     if (page === 'home') return homePage();
     if (page === 'products') return productsPage();
     if (page === 'links') return linksPage();
+    if (page === 'customers') return customersPage();
     const configs = {
       links: ['store_settings', 'Link di vendita', item => `<div class="row"><span>⌁</span><span><strong>${escapeHtml(item.store_name || 'Il Gatto di Cruci')}</strong><p>Link pubblico del negozio</p></span><b>Attivo</b></div>`],
       orders: ['orders', 'Ordini', item => `<div class="row"><span>✓</span><span><strong>Ordine ${escapeHtml(item.order_number || '#')}</strong><p>${escapeHtml(item.customer_name || item.customer_email || '')} · ${date(item.created_at)} · ${escapeHtml(item.status || 'Da confermare')}</p></span><b>${money(item.total)}</b></div>`],
-      customers: ['customers', 'Clienti', item => `<div class="row"><span>♧</span><span><strong>${escapeHtml(item.email || item.name || 'Cliente')}</strong><p>${Number(item.orders_count || 0)} ordini</p></span></div>`],
       coupons: ['coupons', 'Coupon', item => `<div class="row"><span>✿</span><span><strong>${escapeHtml(item.name)}</strong><p>Codice: ${escapeHtml(item.code)}</p></span><b>${Number(item.percent_off || 0)}%</b></div>`],
     };
     if (configs[page]) return simpleList(page, ...configs[page]);
