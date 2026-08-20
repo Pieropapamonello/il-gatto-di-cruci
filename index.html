@@ -50,7 +50,7 @@
     <aside class="cart" id="cart" aria-label="Carrello" aria-hidden="true">
       <div class="cart-head"><h2>La tua borsa</h2><button id="cart-close" aria-label="Chiudi carrello">×</button></div>
       <div id="cart-items" class="cart-items"><p class="empty">La tua borsa è vuota.</p></div>
-      <div class="cart-footer"><div id="cart-total" class="cart-total" hidden></div><p>Per concludere l'ordine, inviaci la richiesta su WhatsApp.</p><a id="whatsapp-order" class="button" target="_blank" rel="noreferrer">Invia richiesta</a></div>
+      <div class="cart-footer"><div id="cart-total" class="cart-total" hidden></div><fieldset class="shipping" id="shipping"><legend>Spedizione</legend><label><input type="radio" name="shipping" value="pickup" checked> InPost — punto ritiro <strong>€3,90</strong></label><label><input type="radio" name="shipping" value="home"> A domicilio <strong>€6,90</strong></label></fieldset><div class="customer-fields"><label>Email<input id="customer-email" type="email" autocomplete="email" placeholder="nome@email.it" required></label><label id="address-field">Indirizzo di consegna<input id="customer-address" type="text" autocomplete="street-address" placeholder="Via, numero civico, CAP, città" required></label></div><p>Per concludere l'ordine, inviaci la richiesta su WhatsApp.</p><a id="whatsapp-order" class="button" target="_blank" rel="noreferrer">Invia richiesta</a></div>
     </aside>
     <dialog class="product-dialog" id="product-dialog" aria-label="Dettaglio prodotto">
       <button class="dialog-close" id="dialog-close" aria-label="Chiudi dettaglio">×</button>
