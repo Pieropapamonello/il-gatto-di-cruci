@@ -20,7 +20,7 @@
       const session = await response.json();
       if (!response.ok) throw new Error(session.error_description || session.msg || 'Email o password non corretti.');
       localStorage.setItem(`sb-${project}-auth-token`, JSON.stringify(session));
-      location.reload();
+      location.replace('/admin/dashboard.html');
     } catch (error) {
       message.textContent = error.name === 'TimeoutError' ? 'Connessione a Supabase bloccata o troppo lenta. Disattiva lo Scudo di Brave per questo sito e riprova.' : `Errore: ${error.message || 'riprova.'}`;
       button.disabled = false;
