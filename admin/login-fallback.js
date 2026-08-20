@@ -15,13 +15,14 @@
     try {
       const response = await fetch(`https://${project}.supabase.co/auth/v1/token?grant_type=password`, {
         method: 'POST', headers: { apikey: key, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }),
+        signal: AbortSignal.timeout(12000),
       });
       const session = await response.json();
       if (!response.ok) throw new Error(session.error_description || session.msg || 'Email o password non corretti.');
       localStorage.setItem(`sb-${project}-auth-token`, JSON.stringify(session));
       location.reload();
     } catch (error) {
-      message.textContent = `Errore: ${error.message || 'riprova.'}`;
+      message.textContent = error.name === 'TimeoutError' ? 'Connessione a Supabase bloccata o troppo lenta. Disattiva lo Scudo di Brave per questo sito e riprova.' : `Errore: ${error.message || 'riprova.'}`;
       button.disabled = false;
     }
   }
