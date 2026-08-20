@@ -5,6 +5,7 @@
   const API_KEY = 'sb_publishable_0zscL8lzkUbSgDHxs0lfIw_Pu6XVMJV';
   const ADMIN_EMAIL = 'mekamiepixie@gmail.com';
   const SESSION_KEY = `sb-${PROJECT}-auth-token`;
+  const STORAGE_BUCKET = 'product-images';
   const app = document.querySelector('#app');
   const nav = document.querySelector('#nav');
   const content = document.querySelector('#content');
@@ -52,6 +53,24 @@
       if (error.name === 'AbortError') throw new Error('Supabase non risponde. Riprova tra poco.');
       throw error;
     } finally { clearTimeout(timer); }
+  }
+
+  async function uploadProductImage(file) {
+    if (!file) return null;
+    if (!file.type.startsWith('image/')) throw new Error('Seleziona un file immagine valido.');
+    if (file.size > 8 * 1024 * 1024) throw new Error('La foto deve pesare al massimo 8 MB.');
+    const extension = (file.name.split('.').pop() || 'jpg').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'jpg';
+    const path = `${session.user.id}/${crypto.randomUUID()}.${extension}`;
+    const response = await fetch(`https://${PROJECT}.supabase.co/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+      method: 'POST',
+      headers: { apikey: API_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': file.type, 'x-upsert': 'false' },
+      body: file,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.message || 'Caricamento foto non riuscito. Esegui prima lo script di configurazione immagini in Supabase.');
+    }
+    return `https://${PROJECT}.supabase.co/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
   }
 
   const pages = [
@@ -149,13 +168,33 @@
         <label>Prezzo in euro<input id="price" type="number" min="0" step="0.01" required value="${escapeHtml(product?.price ?? '')}"></label>
         <label>Quantita senza varianti<input id="stock" type="number" min="0" step="1" required value="${escapeHtml(product?.stock ?? 0)}"></label>
         <label class="wide">Descrizione<textarea id="description" rows="4">${escapeHtml(product?.description || '')}</textarea></label>
-        <label class="wide">URL foto principale<input id="image-url" type="url" placeholder="https://..." value="${escapeHtml(product?.image_url || '')}"></label>
+        <label class="wide">Foto principale
+          <span class="image-upload-control">
+            <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+            <button type="button" class="image-picker" id="image-picker">▣<span>Aggiungi immagine</span></button>
+            <img id="image-preview" class="editor-image-preview ${product?.image_url ? '' : 'is-hidden'}" src="${escapeHtml(product?.image_url || '')}" alt="Anteprima foto">
+            <span id="image-file-name" class="muted">${product?.image_url ? 'Foto attuale: puoi sostituirla.' : 'PNG, JPG, WEBP o GIF · massimo 8 MB'}</span>
+          </span>
+        </label>
+        <label class="wide">Oppure URL foto principale<input id="image-url" type="url" placeholder="https://..." value="${escapeHtml(product?.image_url || '')}"></label>
         <label class="wide">Varianti (una per riga: nome | quantita)<textarea id="variants" rows="7" placeholder="Ametista | 3&#10;Catena argento | 2">${escapeHtml(variants)}</textarea><small>Se inserisci varianti, la disponibilita viene calcolata dalle loro quantita.</small></label>
         <label class="check wide"><input id="available" type="checkbox" ${product?.available !== false ? 'checked' : ''}> Prodotto visibile e ordinabile</label>
       </div><p id="form-message" class="error-message"></p><div class="actions"><button type="button" class="ghost" id="cancel-edit-2">Annulla</button><button type="submit">${creating ? 'Crea prodotto' : 'Salva modifiche'}</button></div></form>`;
     const cancel = () => creating ? productsPage() : productDetail(product);
     document.querySelector('#cancel-edit').addEventListener('click', cancel);
     document.querySelector('#cancel-edit-2').addEventListener('click', cancel);
+    const imageFile = document.querySelector('#image-file');
+    const imagePreview = document.querySelector('#image-preview');
+    const imageName = document.querySelector('#image-file-name');
+    document.querySelector('#image-picker').addEventListener('click', () => imageFile.click());
+    imageFile.addEventListener('change', () => {
+      const file = imageFile.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) { imageFile.value = ''; imageName.textContent = 'Seleziona un file immagine valido.'; return; }
+      imagePreview.src = URL.createObjectURL(file);
+      imagePreview.classList.remove('is-hidden');
+      imageName.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`;
+    });
     document.querySelector('#product-form').addEventListener('submit', async event => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -172,8 +211,10 @@
         available: document.querySelector('#available').checked,
       };
       if (!payload.name || Number.isNaN(payload.price)) { message.textContent = 'Inserisci nome e prezzo validi.'; return; }
-      submit.disabled = true; message.textContent = 'Salvataggio...';
+      submit.disabled = true; message.textContent = imageFile.files?.[0] ? 'Caricamento foto...' : 'Salvataggio...';
       try {
+        const uploadedImage = await uploadProductImage(imageFile.files?.[0]);
+        if (uploadedImage) payload.image_url = uploadedImage;
         let saved;
         if (creating) {
           saved = await api('products', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...payload, owner_id: session.user.id }) });
