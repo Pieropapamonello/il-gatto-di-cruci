@@ -6,6 +6,8 @@ alter table public.products add column if not exists image_url text default '';
 alter table public.products add column if not exists available boolean default true;
 alter table public.products add column if not exists description text default '';
 alter table public.products add column if not exists stock integer not null default 0;
+alter table public.products add column if not exists legacy_id integer;
+create unique index if not exists products_owner_legacy_id_key on public.products(owner_id, legacy_id) where legacy_id is not null;
 
 alter table public.orders add column if not exists customer_name text;
 alter table public.orders add column if not exists items jsonb not null default '[]'::jsonb;
