@@ -268,6 +268,36 @@
     } catch (error) { content.innerHTML = `<h1>Clienti</h1>${notice(error.message, true)}`; }
   }
 
+  async function couponsPage() {
+    content.innerHTML = '<div class="top"><h1>Coupon</h1><button id="new-coupon">Nuovo coupon</button></div><p class="muted">Caricamento coupon...</p>';
+    try {
+      const coupons = await api('coupons?select=*&order=created_at.desc');
+      const draw = () => {
+        content.innerHTML = `<div class="top"><h1>Coupon</h1><button id="new-coupon">Nuovo coupon</button></div><div class="list">${coupons.length ? coupons.map(coupon => `<button class="coupon-row" data-coupon="${coupon.id}"><span>Coupon</span><span><strong>${escapeHtml(coupon.name)}</strong><p>Creato il ${date(coupon.created_at)} · ${coupon.active ? 'Attivo' : 'Disattivo'}</p></span><b>${escapeHtml(coupon.code)} · ${Number(coupon.percent_off)}%</b></button>`).join('') : '<p class="empty">Non ci sono ancora coupon. Crea il primo codice sconto.</p>'}</div>`;
+        document.querySelector('#new-coupon').addEventListener('click', () => couponEditor());
+        content.querySelectorAll('[data-coupon]').forEach(row => row.addEventListener('click', () => couponEditor(coupons.find(coupon => coupon.id === row.dataset.coupon))));
+      };
+      draw();
+    } catch (error) { content.innerHTML = `<h1>Coupon</h1>${notice(error.message, true)}`; }
+  }
+
+  function couponEditor(coupon = null) {
+    const creating = !coupon?.id;
+    navigation('coupons');
+    content.innerHTML = `<button class="back" id="back-coupons">Indietro</button><h1>${creating ? 'Nuovo coupon' : 'Modifica coupon'}</h1><form id="coupon-form" class="editor-form"><div class="form-grid"><label>Nome coupon<input id="coupon-name" required value="${escapeHtml(coupon?.name || '')}" placeholder="Sconto 10%"></label><label>Codice<input id="coupon-code" required value="${escapeHtml(coupon?.code || '')}" placeholder="SCONTO10"></label><label>Sconto percentuale<input id="coupon-percent" required type="number" min="0" max="100" step="0.01" value="${escapeHtml(coupon?.percent_off ?? 10)}"></label><label class="check"><input id="coupon-active" type="checkbox" ${coupon?.active !== false ? 'checked' : ''}> Coupon attivo</label></div><p id="coupon-message" class="error-message"></p><div class="actions">${creating ? '' : '<button type="button" id="delete-coupon" class="ghost">Elimina</button>'}<button type="button" id="cancel-coupon" class="ghost">Annulla</button><button type="submit">${creating ? 'Crea coupon' : 'Salva modifiche'}</button></div></form>`;
+    document.querySelector('#back-coupons').addEventListener('click', couponsPage);
+    document.querySelector('#cancel-coupon').addEventListener('click', couponsPage);
+    document.querySelector('#coupon-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const message = document.querySelector('#coupon-message'); const submit = event.currentTarget.querySelector('[type="submit"]');
+      const payload = { name: document.querySelector('#coupon-name').value.trim(), code: document.querySelector('#coupon-code').value.trim().toUpperCase(), percent_off: Number(document.querySelector('#coupon-percent').value), active: document.querySelector('#coupon-active').checked };
+      if (!payload.name || !payload.code) { message.textContent = 'Inserisci nome e codice.'; return; }
+      submit.disabled = true; message.textContent = 'Salvataggio...';
+      try { if (creating) await api('coupons', { method: 'POST', body: JSON.stringify({ ...payload, owner_id: session.user.id }) }); else await api(`coupons?id=eq.${encodeURIComponent(coupon.id)}`, { method: 'PATCH', body: JSON.stringify(payload) }); couponsPage(); } catch (error) { message.textContent = error.message; submit.disabled = false; }
+    });
+    document.querySelector('#delete-coupon')?.addEventListener('click', async () => { if (!confirm(`Eliminare il coupon ${coupon.code}?`)) return; try { await api(`coupons?id=eq.${encodeURIComponent(coupon.id)}`, { method: 'DELETE' }); couponsPage(); } catch (error) { alert(error.message); } });
+  }
+
   async function simpleList(page, table, title, row) {
     content.innerHTML = `<h1>${title}</h1><p class="muted">Caricamento...</p>`;
     try {
@@ -282,10 +312,10 @@
     if (page === 'products') return productsPage();
     if (page === 'links') return linksPage();
     if (page === 'customers') return customersPage();
+    if (page === 'coupons') return couponsPage();
     const configs = {
       links: ['store_settings', 'Link di vendita', item => `<div class="row"><span>⌁</span><span><strong>${escapeHtml(item.store_name || 'Il Gatto di Cruci')}</strong><p>Link pubblico del negozio</p></span><b>Attivo</b></div>`],
       orders: ['orders', 'Ordini', item => `<div class="row"><span>✓</span><span><strong>Ordine ${escapeHtml(item.order_number || '#')}</strong><p>${escapeHtml(item.customer_name || item.customer_email || '')} · ${date(item.created_at)} · ${escapeHtml(item.status || 'Da confermare')}</p></span><b>${money(item.total)}</b></div>`],
-      coupons: ['coupons', 'Coupon', item => `<div class="row"><span>✿</span><span><strong>${escapeHtml(item.name)}</strong><p>Codice: ${escapeHtml(item.code)}</p></span><b>${Number(item.percent_off || 0)}%</b></div>`],
     };
     if (configs[page]) return simpleList(page, ...configs[page]);
     const messages = {
