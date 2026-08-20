@@ -29,7 +29,7 @@
         for (const item of inventory) {
           const candidates = buckets.get(norm(item.n)) || []; const current = candidates.shift();
           const sourceCandidates = catalogueBuckets.get(norm(item.n)) || []; const source = sourceCandidates.shift();
-          const payload = { stock: item.s, available: item.s > 0, price: item.p, ...(Number.isInteger(source?.id) ? { legacy_id: source.id } : {}) };
+          const payload = { stock: item.s, available: item.s > 0, price: item.p };
           if (current) {
             const patch = await fetch(`https://${project}.supabase.co/rest/v1/products?id=eq.${encodeURIComponent(current.id)}`, { method: 'PATCH', headers, body: JSON.stringify(payload) });
             if (!patch.ok) throw new Error(`Errore aggiornando ${item.n}`); updated++;
