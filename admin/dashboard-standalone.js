@@ -105,9 +105,10 @@
   function productRow(product) {
     const quantity = stock(product);
     const unavailable = product.available === false || quantity <= 0;
+    const variantCount = Array.isArray(product.variants) ? product.variants.length : 0;
     return `<button class="product-row" data-product-id="${escapeHtml(product.id)}">
       ${product.image_url ? `<img src="${escapeHtml(product.image_url)}" alt="">` : '<span class="image-placeholder">◇</span>'}
-      <span><strong>${escapeHtml(product.name)}</strong><small>Quantita: ${quantity}${unavailable ? ' · Esaurito' : ''}</small></span>
+      <span><strong>${escapeHtml(product.name)}</strong><small>Quantita: ${quantity}${variantCount ? ` · ${variantCount} varianti` : ''}${unavailable ? ' · Esaurito' : ''}</small></span>
       <b>${money(product.price)}</b>
     </button>`;
   }
@@ -116,15 +117,20 @@
     content.innerHTML = '<div class="top"><h1>Prodotti</h1><button id="new-product">＋ Nuovo prodotto</button></div><p class="muted">Caricamento prodotti...</p>';
     try {
       productsCache = await api('products?select=*&order=created_at.desc');
+      content.innerHTML = `<div class="top"><h1>Prodotti</h1><button id="new-product">＋ Nuovo prodotto</button></div>
+        <input id="product-search" class="search" placeholder="Cerca..." autocomplete="off">
+        <p id="products-count" class="muted"></p><div id="products-list" class="list"></div>`;
+      const search = content.querySelector('#product-search');
+      const count = content.querySelector('#products-count');
+      const list = content.querySelector('#products-list');
       const draw = term => {
         const filtered = productsCache.filter(product => product.name.toLowerCase().includes(term.toLowerCase()));
-        content.innerHTML = `<div class="top"><h1>Prodotti</h1><button id="new-product">＋ Nuovo prodotto</button></div>
-          <input id="product-search" class="search" placeholder="Cerca..." value="${escapeHtml(term)}">
-          <p class="muted">Tutti · ${filtered.length}</p><div class="list">${filtered.length ? filtered.map(productRow).join('') : '<p class="empty">Nessun prodotto trovato.</p>'}</div>`;
-        document.querySelector('#new-product').addEventListener('click', () => productEditor());
-        document.querySelector('#product-search').addEventListener('input', event => draw(event.target.value));
-        content.querySelectorAll('[data-product-id]').forEach(row => row.addEventListener('click', () => productDetail(productsCache.find(product => product.id === row.dataset.productId))));
+        count.textContent = `Tutti · ${filtered.length}`;
+        list.innerHTML = filtered.length ? filtered.map(productRow).join('') : '<p class="empty">Nessun prodotto trovato.</p>';
+        list.querySelectorAll('[data-product-id]').forEach(row => row.addEventListener('click', () => productDetail(productsCache.find(product => product.id === row.dataset.productId))));
       };
+      content.querySelector('#new-product').addEventListener('click', () => productEditor());
+      search.addEventListener('input', event => draw(event.target.value));
       draw('');
     } catch (error) { content.innerHTML = `<h1>Prodotti</h1>${notice(error.message, true)}`; }
   }
@@ -166,7 +172,7 @@
       <form id="product-form" class="editor-form"><div class="form-grid">
         <label class="wide">Nome prodotto<input id="name" required value="${escapeHtml(product?.name || '')}"></label>
         <label>Prezzo in euro<input id="price" type="number" min="0" step="0.01" required value="${escapeHtml(product?.price ?? '')}"></label>
-        <label>Quantita senza varianti<input id="stock" type="number" min="0" step="1" required value="${escapeHtml(product?.stock ?? 0)}"></label>
+        <label>Quantita senza varianti<input id="stock" type="number" min="0" step="1" required value="${escapeHtml(product?.stock ?? 0)}"><small>Usa questo campo solo per i prodotti senza varianti.</small></label>
         <label class="wide">Descrizione<textarea id="description" rows="4">${escapeHtml(product?.description || '')}</textarea></label>
         <label class="wide">Foto principale
           <span class="image-upload-control">
@@ -177,7 +183,7 @@
           </span>
         </label>
         <label class="wide">Oppure URL foto principale<input id="image-url" type="url" placeholder="https://..." value="${escapeHtml(product?.image_url || '')}"></label>
-        <label class="wide">Varianti (una per riga: nome | quantita)<textarea id="variants" rows="7" placeholder="Ametista | 3&#10;Catena argento | 2">${escapeHtml(variants)}</textarea><small>Se inserisci varianti, la disponibilita viene calcolata dalle loro quantita.</small></label>
+        <label class="wide">Varianti (una per riga: nome | quantita)<textarea id="variants" rows="7" placeholder="Occhio di Falco Oro | 2&#10;Quarzo Oro | 3">${escapeHtml(variants)}</textarea><small>Ogni riga e una scelta acquistabile separata. Scrivi il nome esattamente come compare nel menu del negozio, per esempio: <b>Occhio di Falco Oro | 2</b> e <b>Quarzo Oro | 3</b>. Se inserisci varianti, la disponibilita totale e calcolata soltanto dalla somma delle loro quantita; il campo “Quantita senza varianti” viene ignorato.</small></label>
         <label class="check wide"><input id="available" type="checkbox" ${product?.available !== false ? 'checked' : ''}> Prodotto visibile e ordinabile</label>
       </div><p id="form-message" class="error-message"></p><div class="actions"><button type="button" class="ghost" id="cancel-edit-2">Annulla</button><button type="submit">${creating ? 'Crea prodotto' : 'Salva modifiche'}</button></div></form>`;
     const cancel = () => creating ? productsPage() : productDetail(product);
