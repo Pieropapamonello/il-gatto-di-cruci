@@ -1,0 +1,34 @@
+/* Phone drawer: use one natural scroll area, avoiding a tiny nested product list. */
+@media (max-width: 800px) {
+  .cart {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 22px 20px max(22px, env(safe-area-inset-bottom));
+  }
+
+  .cart-items {
+    flex: none;
+    overflow: visible;
+    min-height: 0;
+  }
+
+  .cart-head {
+    position: sticky;
+    top: -22px;
+    z-index: 1;
+    background: var(--paper);
+    padding-top: 22px;
+  }
+
+  .cart-row {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 14px 0;
+  }
+
+  .cart-row img { width: 64px; height: 64px; }
+  .cart-row strong { font-size: 14px; line-height: 1.25; }
+  .cart-footer { padding-bottom: 8px; }
+  .name-fields { grid-template-columns: 1fr 1fr; gap: 8px; }
+}
