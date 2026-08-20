@@ -8,7 +8,7 @@ const productVariants = {
 };
 
 document.addEventListener('click', event => {
-  const trigger = event.target.closest('[data-detail]'); const card = trigger?.closest('.product-card');
+  const trigger = event.target.closest('[data-detail], .add'); const card = trigger?.closest('.product-card');
   const title = card?.querySelector('.product-name')?.textContent.trim(); const choices = productVariants[title];
   if (!choices) return;
   event.preventDefault(); event.stopImmediatePropagation();
