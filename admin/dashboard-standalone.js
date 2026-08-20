@@ -192,6 +192,62 @@
     catch (error) { alert(`Non e stato possibile eliminare il prodotto: ${error.message}`); }
   }
 
+  function linkCard(link, products) {
+    const included = products.filter(product => link.productIds.includes(product.id));
+    const cover = included.find(product => product.image_url)?.image_url;
+    return `<button class="link-card" data-link-id="${link.id}">${cover ? `<img src="${escapeHtml(cover)}" alt="">` : '<span class="link-cover">Link</span>'}<strong>${escapeHtml(link.title)}</strong><small>Creato il ${date(link.created_at)}</small><span class="link-card-footer">${included.length} prodotti <b>Condividi</b></span></button>`;
+  }
+
+  async function linksPage() {
+    content.innerHTML = '<div class="top"><h1>Link di vendita</h1><button id="new-link">Nuovo link</button></div><p class="muted">Caricamento link...</p>';
+    try {
+      const [links, products, relations] = await Promise.all([api('sale_links?select=*&order=created_at.desc'), api('products?select=*&order=created_at.desc'), api('sale_link_products?select=link_id,product_id')]);
+      const prepared = links.map(link => ({ ...link, productIds: relations.filter(relation => relation.link_id === link.id).map(relation => relation.product_id) }));
+      const draw = term => {
+        const filtered = prepared.filter(link => link.title.toLowerCase().includes(term.toLowerCase()));
+        content.innerHTML = `<div class="top"><h1>Link di vendita</h1><button id="new-link">Nuovo link</button></div><input id="link-search" class="search" placeholder="Cerca..." value="${escapeHtml(term)}"><div class="link-grid">${filtered.length ? filtered.map(link => linkCard(link, products)).join('') : '<p class="empty">Crea il tuo primo link di vendita.</p>'}</div>`;
+        document.querySelector('#new-link').addEventListener('click', () => linkEditor(products));
+        document.querySelector('#link-search').addEventListener('input', event => draw(event.target.value));
+        content.querySelectorAll('[data-link-id]').forEach(card => card.addEventListener('click', () => linkDetail(prepared.find(link => link.id === card.dataset.linkId), products)));
+      };
+      draw('');
+    } catch (error) { content.innerHTML = `<h1>Link di vendita</h1>${notice(`${error.message} Esegui lo script SQL aggiornato per attivare i link.`, true)}`; }
+  }
+
+  function linkEditor(products) {
+    navigation('links');
+    content.innerHTML = `<button class="back" id="close-link">Chiudi</button><h1>Nuovo link</h1><form id="link-form" class="editor-form"><label>Titolo<input id="link-title" required placeholder="Es. Per Rosario"></label><label>Descrizione (opzionale)<textarea id="link-description" rows="3"></textarea></label><fieldset class="pick-list"><legend>Prodotti</legend><p class="muted">Scegli i prodotti che vuoi mettere in vendita.</p>${products.map(product => `<label class="pick-item"><input type="checkbox" value="${product.id}"><span>${escapeHtml(product.name)}<small>${money(product.price)} · Quantita: ${stock(product)}</small></span></label>`).join('')}</fieldset><p id="link-message" class="error-message"></p><div class="actions"><button type="button" class="ghost" id="cancel-link">Annulla</button><button type="submit">Crea link</button></div></form>`;
+    const close = () => linksPage();
+    document.querySelector('#close-link').addEventListener('click', close);
+    document.querySelector('#cancel-link').addEventListener('click', close);
+    document.querySelector('#link-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const message = document.querySelector('#link-message');
+      const submit = event.currentTarget.querySelector('[type="submit"]');
+      const ids = [...content.querySelectorAll('.pick-item input:checked')].map(input => input.value);
+      if (!ids.length) { message.textContent = 'Seleziona almeno un prodotto.'; return; }
+      submit.disabled = true; message.textContent = 'Creazione link...';
+      try {
+        const created = await api('sale_links', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ owner_id: session.user.id, title: document.querySelector('#link-title').value.trim(), description: document.querySelector('#link-description').value.trim() }) });
+        const link = created[0];
+        await api('sale_link_products', { method: 'POST', body: JSON.stringify(ids.map(product_id => ({ link_id: link.id, product_id }))) });
+        linkDetail({ ...link, productIds: ids }, products);
+      } catch (error) { message.textContent = error.message; submit.disabled = false; }
+    });
+  }
+
+  function linkDetail(link, products) {
+    if (!link) return linksPage();
+    navigation('links');
+    const included = products.filter(product => link.productIds.includes(product.id));
+    const publicUrl = `${location.origin}/?link=${encodeURIComponent(link.slug)}`;
+    content.innerHTML = `<button class="back" id="back-links">Indietro</button><div class="top product-title"><h1>${escapeHtml(link.title)}</h1><button class="ghost" id="delete-link">Elimina</button></div><p class="muted">Creato il ${date(link.created_at)}</p><section class="stats link-stats"><div class="stat">Visite<b>${Number(link.visits || 0)}</b></div><div class="stat">Ordini<b>0</b></div></section><section class="share-box"><strong>Condividi questo link per iniziare a vendere</strong><div><input readonly value="${escapeHtml(publicUrl)}"><button class="ghost" id="copy-link">Copia</button></div><button id="share-link">Condividi</button></section><h2>Prodotti in vendita · ${included.length}</h2><div class="list">${included.map(productRow).join('') || '<p class="empty">Nessun prodotto selezionato.</p>'}</div>`;
+    document.querySelector('#back-links').addEventListener('click', linksPage);
+    document.querySelector('#copy-link').addEventListener('click', async () => { await navigator.clipboard.writeText(publicUrl); document.querySelector('#copy-link').textContent = 'Copiato'; });
+    document.querySelector('#share-link').addEventListener('click', async () => { if (navigator.share) await navigator.share({ title: link.title, url: publicUrl }); else await navigator.clipboard.writeText(publicUrl); });
+    document.querySelector('#delete-link').addEventListener('click', async () => { if (!confirm(`Eliminare il link ${link.title}?`)) return; try { await api(`sale_links?id=eq.${encodeURIComponent(link.id)}`, { method: 'DELETE' }); linksPage(); } catch (error) { alert(error.message); } });
+  }
+
   async function simpleList(page, table, title, row) {
     content.innerHTML = `<h1>${title}</h1><p class="muted">Caricamento...</p>`;
     try {
@@ -204,6 +260,7 @@
     navigation(page);
     if (page === 'home') return homePage();
     if (page === 'products') return productsPage();
+    if (page === 'links') return linksPage();
     const configs = {
       links: ['store_settings', 'Link di vendita', item => `<div class="row"><span>⌁</span><span><strong>${escapeHtml(item.store_name || 'Il Gatto di Cruci')}</strong><p>Link pubblico del negozio</p></span><b>Attivo</b></div>`],
       orders: ['orders', 'Ordini', item => `<div class="row"><span>✓</span><span><strong>Ordine ${escapeHtml(item.order_number || '#')}</strong><p>${escapeHtml(item.customer_name || item.customer_email || '')} · ${date(item.created_at)} · ${escapeHtml(item.status || 'Da confermare')}</p></span><b>${money(item.total)}</b></div>`],
