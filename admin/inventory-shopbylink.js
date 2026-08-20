@@ -17,30 +17,25 @@
       button.disabled = true; button.textContent = 'Importazione in corso...';
       const headers = { apikey: key, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json', Prefer: 'return=representation' };
       try {
-        const response = await fetch(`https://${project}.supabase.co/rest/v1/products?select=id,name,legacy_id`, { headers });
+        const response = await fetch(`https://${project}.supabase.co/rest/v1/products?select=id,name`, { headers });
         if (!response.ok) throw new Error('Impossibile leggere i prodotti nel database.');
         const existing = await response.json(); const buckets = new Map();
         let catalogue = [];
         try { const source = await fetch('/app.js', { cache: 'no-store' }).then(result => result.text()); const start = source.indexOf('const products = ') + 17, end = source.indexOf('\n\nlet activeCategory'); catalogue = JSON.parse(source.slice(start, end)); } catch { catalogue = []; }
-        const databaseCounts = new Map(); const legacyIdsInUse = new Set();
-        existing.forEach(product => { const id = norm(product.name); const list = buckets.get(id) || []; list.push(product); buckets.set(id, list); databaseCounts.set(id, (databaseCounts.get(id) || 0) + 1); if (Number.isInteger(product.legacy_id)) legacyIdsInUse.add(product.legacy_id); });
+        existing.forEach(product => { const id = norm(product.name); const list = buckets.get(id) || []; list.push(product); buckets.set(id, list); });
         const catalogueBuckets = new Map();
-        const catalogueCounts = new Map();
-        catalogue.forEach(product => { const id = norm(product.name); const list = catalogueBuckets.get(id) || []; list.push(product); catalogueBuckets.set(id, list); catalogueCounts.set(id, (catalogueCounts.get(id) || 0) + 1); });
+        catalogue.forEach(product => { const id = norm(product.name); const list = catalogueBuckets.get(id) || []; list.push(product); catalogueBuckets.set(id, list); });
         let updated = 0, created = 0, removedDuplicates = 0;
         for (const item of inventory) {
           const key = norm(item.n); const candidates = buckets.get(key) || []; const current = candidates.shift();
           const sourceCandidates = catalogueBuckets.get(key) || []; const source = sourceCandidates.shift();
-          const safeLegacyId = source && Number.isInteger(source.id) && catalogueCounts.get(key) === 1 && databaseCounts.get(key) <= 1 && (!legacyIdsInUse.has(source.id) || current?.legacy_id === source.id) ? source.id : null;
-          const payload = { stock: item.s, available: item.s > 0, price: item.p, ...(safeLegacyId === null ? {} : { legacy_id: safeLegacyId }) };
+          const payload = { stock: item.s, available: item.s > 0, price: item.p };
           if (current) {
             const patch = await fetch(`https://${project}.supabase.co/rest/v1/products?id=eq.${encodeURIComponent(current.id)}`, { method: 'PATCH', headers, body: JSON.stringify(payload) });
-            if (!patch.ok) throw new Error(`Errore aggiornando ${item.n}`); updated++;
-            if (safeLegacyId !== null) legacyIdsInUse.add(safeLegacyId);
+            if (!patch.ok) throw new Error(`Errore aggiornando ${item.n}: ${patch.status} ${(await patch.text()).slice(0, 180)}`); updated++;
           } else {
             const post = await fetch(`https://${project}.supabase.co/rest/v1/products`, { method: 'POST', headers, body: JSON.stringify({ ...payload, owner_id: session.user.id, name: item.n, description: source?.description || '', image_url: source?.image || '', variants: [] }) });
-            if (!post.ok) throw new Error(`Errore creando ${item.n}`); created++;
-            if (safeLegacyId !== null) legacyIdsInUse.add(safeLegacyId);
+            if (!post.ok) throw new Error(`Errore creando ${item.n}: ${post.status} ${(await post.text()).slice(0, 180)}`); created++;
           }
           if (norm(item.n).includes('eremitacollaneessenziali')) {
             while (candidates.length) {
