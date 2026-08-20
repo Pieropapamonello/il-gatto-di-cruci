@@ -61,7 +61,10 @@ begin
 
     requested_variant := nullif(trim(coalesce(item->>'variant','')), '');
     variants_value := product_row.variants;
-    if requested_variant is not null then
+    -- When variants have their own inventory, deduct from the selected one.
+    -- For legacy/imported products with no per-variant quantities yet, keep
+    -- the chosen variant on the order and deduct from the product total.
+    if requested_variant is not null and jsonb_array_length(coalesce(variants_value, '[]'::jsonb)) > 0 then
       variant_index := null;
       for variant_row, variant_index in select value, ordinality - 1 from jsonb_array_elements(variants_value) with ordinality loop
         if variant_row->>'name' = requested_variant then exit; end if;
