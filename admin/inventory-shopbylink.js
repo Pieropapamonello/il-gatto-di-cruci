@@ -23,10 +23,12 @@
         let catalogue = [];
         try { const source = await fetch('/app.js', { cache: 'no-store' }).then(result => result.text()); const start = source.indexOf('const products = ') + 17, end = source.indexOf('\n\nlet activeCategory'); catalogue = JSON.parse(source.slice(start, end)); } catch { catalogue = []; }
         existing.forEach(product => { const id = norm(product.name); const list = buckets.get(id) || []; list.push(product); buckets.set(id, list); });
+        const catalogueBuckets = new Map();
+        catalogue.forEach(product => { const id = norm(product.name); const list = catalogueBuckets.get(id) || []; list.push(product); catalogueBuckets.set(id, list); });
         let updated = 0, created = 0;
         for (const item of inventory) {
           const candidates = buckets.get(norm(item.n)) || []; const current = candidates.shift();
-          const source = catalogue.find(product => norm(product.name) === norm(item.n));
+          const sourceCandidates = catalogueBuckets.get(norm(item.n)) || []; const source = sourceCandidates.shift();
           const payload = { stock: item.s, available: item.s > 0, price: item.p, ...(Number.isInteger(source?.id) ? { legacy_id: source.id } : {}) };
           if (current) {
             const patch = await fetch(`https://${project}.supabase.co/rest/v1/products?id=eq.${encodeURIComponent(current.id)}`, { method: 'PATCH', headers, body: JSON.stringify(payload) });
