@@ -41,8 +41,20 @@ begin
   for item in select value from jsonb_array_elements(p_items) loop
     qty := coalesce((item->>'quantity')::integer, 0);
     if qty < 1 or qty > 10 then raise exception 'Quantità non valida'; end if;
+    -- Prefer the fixed catalog ID. Product name is a fallback for products
+    -- imported before the old catalog ID could be matched.
     select * into product_row from public.products
-      where legacy_id = (item->>'legacy_id')::integer and available = true for update;
+      where available = true
+        and (
+          legacy_id = nullif(item->>'legacy_id','')::integer
+          or (
+            nullif(trim(coalesce(item->>'product_name','')), '') is not null
+            and lower(trim(name)) = lower(trim(item->>'product_name'))
+          )
+        )
+      order by case when legacy_id = nullif(item->>'legacy_id','')::integer then 0 else 1 end
+      limit 1
+      for update;
     if not found then raise exception 'Un prodotto non è più disponibile'; end if;
     if order_owner_id is null then order_owner_id := product_row.owner_id;
     elsif order_owner_id <> product_row.owner_id then raise exception 'I prodotti devono appartenere allo stesso catalogo'; end if;
