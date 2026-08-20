@@ -11,7 +11,7 @@
     const anchor = document.querySelector('#new-product'); if (!anchor || document.querySelector('#import-shopbylink-stock')) return;
     const button = document.createElement('button'); button.id = 'import-shopbylink-stock'; button.className = 'ghost'; button.textContent = 'Importa disponibilita ShopByLink'; anchor.before(button);
     button.addEventListener('click', async () => {
-      if (!confirm(`Importare disponibilita e prezzi di ${inventory.length} prodotti? I prodotti esistenti verranno aggiornati; quelli mancanti creati.`)) return;
+      if (!confirm(`Importare disponibilita e prezzi di ${inventory.length} prodotti? I prodotti esistenti verranno aggiornati; quelli mancanti creati. Se esiste una copia doppia dell’Eremita, verra rimossa.`)) return;
       let session; try { session = JSON.parse(localStorage.getItem(sessionKey) || 'null'); } catch { session = null; }
       if (!session?.access_token || !session?.user?.id) { alert('Sessione scaduta: accedi di nuovo.'); return; }
       button.disabled = true; button.textContent = 'Importazione in corso...';
@@ -25,7 +25,7 @@
         existing.forEach(product => { const id = norm(product.name); const list = buckets.get(id) || []; list.push(product); buckets.set(id, list); });
         const catalogueBuckets = new Map();
         catalogue.forEach(product => { const id = norm(product.name); const list = catalogueBuckets.get(id) || []; list.push(product); catalogueBuckets.set(id, list); });
-        let updated = 0, created = 0;
+        let updated = 0, created = 0, removedDuplicates = 0;
         for (const item of inventory) {
           const candidates = buckets.get(norm(item.n)) || []; const current = candidates.shift();
           const sourceCandidates = catalogueBuckets.get(norm(item.n)) || []; const source = sourceCandidates.shift();
@@ -37,8 +37,16 @@
             const post = await fetch(`https://${project}.supabase.co/rest/v1/products`, { method: 'POST', headers, body: JSON.stringify({ ...payload, owner_id: session.user.id, name: item.n, description: source?.description || '', image_url: source?.image || '', variants: [] }) });
             if (!post.ok) throw new Error(`Errore creando ${item.n}`); created++;
           }
+          if (norm(item.n).includes('eremitacollaneessenziali')) {
+            while (candidates.length) {
+              const duplicate = candidates.shift();
+              const removal = await fetch(`https://${project}.supabase.co/rest/v1/products?id=eq.${encodeURIComponent(duplicate.id)}`, { method: 'DELETE', headers });
+              if (!removal.ok) throw new Error('Errore rimuovendo la copia doppia dell’Eremita');
+              removedDuplicates++;
+            }
+          }
         }
-        done = true; button.textContent = `Importati: ${updated} aggiornati, ${created} creati`; setTimeout(() => location.reload(), 1200);
+        done = true; button.textContent = `Importati: ${updated} aggiornati, ${created} creati${removedDuplicates ? `, ${removedDuplicates} duplicato rimosso` : ''}`; setTimeout(() => location.reload(), 1200);
       } catch (error) { button.disabled = false; button.textContent = 'Riprova importazione'; alert(error.message); }
     });
   }
