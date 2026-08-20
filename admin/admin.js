@@ -1,5 +1,5 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-const supabase=createClient('https://waeiuyzteusfsajmzbj.supabase.co','sb_publishable_0zscL8lzkUbSgDHxs0lfIw_Pu6XVMJV');
+const supabase=createClient('https://waeiuyzteusfsajmzblj.supabase.co','sb_publishable_0zscL8lzkUbSgDHxs0lfIw_Pu6XVMJV');
 const $=s=>document.querySelector(s), navItems=[['home','⌂','Home'],['links','⌁','Link'],['products','◇','Prodotti'],['orders','▣','Ordini'],['customers','♧','Clienti'],['coupons','✿','Coupon'],['returns','↩','Resi'],['payments','▦','Incassi'],['settings','⚙','Impostazioni']];let user,products=[];
 function euro(v){return new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(v||0)}function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 async function auth(){const{data:{session}}=await supabase.auth.getSession();if(session){user=session.user;$('#auth-view').hidden=true;$('#app').hidden=false;renderNav();go('home')}}
