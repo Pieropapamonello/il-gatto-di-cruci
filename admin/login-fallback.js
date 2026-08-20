@@ -2,10 +2,9 @@
   const project = 'waeiuyzteusfsajmzblj';
   const key = 'sb_publishable_0zscL8lzkUbSgDHxs0lfIw_Pu6XVMJV';
   const allowedEmail = 'mekamiepixie@gmail.com';
-  document.addEventListener('submit', async event => {
-    const form = event.target.closest('#auth-form');
-    if (!form) return;
-    event.preventDefault(); event.stopImmediatePropagation();
+  async function adminLogin(event) {
+    if (event) { event.preventDefault(); event.stopImmediatePropagation(); }
+    const form = document.querySelector('#auth-form');
     const email = document.querySelector('#auth-email').value.trim().toLowerCase();
     const password = document.querySelector('#auth-password').value;
     const message = document.querySelector('#auth-message');
@@ -25,5 +24,7 @@
       message.textContent = `Errore: ${error.message || 'riprova.'}`;
       button.disabled = false;
     }
-  }, true);
+  }
+  window.adminLogin = adminLogin;
+  document.addEventListener('submit', event => { if (event.target.closest('#auth-form')) adminLogin(event); }, true);
 })();
