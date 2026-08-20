@@ -398,6 +398,19 @@
     } catch (error) { content.innerHTML = `<h1>Ordini</h1>${notice(error.message, true)}`; }
   }
 
+  async function paymentsPage() {
+    content.innerHTML = '<h1>Incassi</h1><p class="muted">Caricamento incassi...</p>';
+    try {
+      const orders = await api('orders?select=*&order=created_at.desc');
+      const pending = orders.filter(order => orderState(order.status) === 'Da confermare');
+      const confirmed = orders.filter(order => ['Approvato', 'In lavorazione', 'Completato'].includes(orderState(order.status)));
+      const pendingTotal = pending.reduce((sum, order) => sum + Number(order.total || 0), 0);
+      const confirmedTotal = confirmed.reduce((sum, order) => sum + Number(order.total || 0), 0);
+      const orderRows = rows => rows.map(order => `<div class="row"><span>€</span><span><strong>Ordine ${escapeHtml(order.order_number || '#')}</strong><p>${escapeHtml(order.customer_name || order.customer_email || '')} · ${date(order.created_at)} · ${escapeHtml(order.payment_method || 'Pagamento manuale')}</p></span><b>${money(order.total)}</b></div>`).join('');
+      content.innerHTML = `<h1>Incassi</h1><section class="stats"><div class="stat">Da confermare<b>${money(pendingTotal)}</b><p>${pending.length} richieste d'ordine</p></div><div class="stat">Incassi approvati<b>${money(confirmedTotal)}</b><p>${confirmed.length} ordini confermati</p></div></section><h2>Richieste da confermare</h2><div class="list">${orderRows(pending) || '<p class="empty">Non ci sono richieste in attesa.</p>'}</div><h2>Incassi approvati</h2><div class="list">${orderRows(confirmed) || '<p class="empty">Non ci sono ancora incassi approvati.</p>'}</div>`;
+    } catch (error) { content.innerHTML = `<h1>Incassi</h1>${notice(error.message, true)}`; }
+  }
+
   function go(page) {
     navigation(page);
     if (page === 'home') return homePage();
@@ -406,13 +419,13 @@
     if (page === 'customers') return customersPage();
     if (page === 'coupons') return couponsPage();
     if (page === 'orders') return ordersPage();
+    if (page === 'payments') return paymentsPage();
     const configs = {
       links: ['store_settings', 'Link di vendita', item => `<div class="row"><span>⌁</span><span><strong>${escapeHtml(item.store_name || 'Il Gatto di Cruci')}</strong><p>Link pubblico del negozio</p></span><b>Attivo</b></div>`],
     };
     if (configs[page]) return simpleList(page, ...configs[page]);
     const messages = {
       returns: ['Resi', 'Gestisci qui le richieste di reso e rimborso ricevute dai clienti.'],
-      payments: ['Incassi', 'Qui troverai gli incassi degli ordini confermati.'],
       settings: ['Impostazioni', 'Le impostazioni del negozio sono salvate in Supabase.'],
     };
     const [title, text] = messages[page];
