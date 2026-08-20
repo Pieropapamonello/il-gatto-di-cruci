@@ -135,9 +135,10 @@
         api('products?select=id,stock,variants'),
         api('orders?select=id,total,status'),
       ]);
-      const total = (orders || []).reduce((sum, order) => sum + Number(order.total || 0), 0);
+      const paidOrders = (orders || []).filter(order => ['Approvato', 'In lavorazione', 'Completato'].includes(orderState(order.status)));
+      const total = paidOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
       content.innerHTML = `<h1>Home</h1><p class="muted">Riepilogo del tuo negozio</p><section class="stats">
-        <div class="stat">Vendite<b>${money(total)}</b></div><div class="stat">Ordini<b>${orders.length}</b></div>
+        <div class="stat">Vendite confermate<b>${money(total)}</b></div><div class="stat">Ordini approvati<b>${paidOrders.length}</b></div>
         <div class="stat">Prodotti<b>${products.length}</b></div><div class="stat">Disponibili<b>${products.filter(product => stock(product) > 0 && product.available !== false).length}</b></div>
       </section>`;
     } catch (error) { content.innerHTML = `<h1>Home</h1>${notice(error.message, true)}`; }
