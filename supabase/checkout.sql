@@ -74,10 +74,39 @@ begin
 
   order_number_value := floor(10000000 + random() * 89999999)::text;
   insert into public.orders(owner_id,order_number,customer_name,customer_email,customer_address,shipping_method,shipping_price,total,status,payment_method,items)
-  values (order_owner_id, order_number_value, trim(p_customer_name), lower(trim(p_customer_email)), trim(p_customer_address), case when p_shipping_method='home' then 'Consegna a domicilio' else 'InPost — punto ritiro' end, shipping_cost, item_total + shipping_cost, 'Nuovo', 'Pagamento manuale', saved_items)
+  values (order_owner_id, order_number_value, trim(p_customer_name), lower(trim(p_customer_email)), trim(p_customer_address), case when p_shipping_method='home' then 'Consegna a domicilio' else 'InPost — punto ritiro' end, shipping_cost, item_total + shipping_cost, 'Da confermare', 'Pagamento manuale', saved_items)
   returning id into order_id;
   return jsonb_build_object('id',order_id,'order_number',order_number_value,'total',item_total + shipping_cost,'items',saved_items);
 end;
 $$;
 revoke all on function public.create_checkout_order(text,text,text,text,jsonb) from public, anon, authenticated;
 grant execute on function public.create_checkout_order(text,text,text,text,jsonb) to service_role;
+
+create or replace function public.set_order_status(p_order_id uuid, p_status text)
+returns void language plpgsql security definer set search_path = public as $$
+declare order_row public.orders%rowtype; item jsonb; product_row public.products%rowtype; idx integer; variant_row jsonb; variants_value jsonb;
+begin
+  if p_status not in ('Da confermare','Approvato','In lavorazione','Completato','Annullato') then raise exception 'Stato non valido'; end if;
+  select * into order_row from public.orders where id=p_order_id and owner_id=auth.uid() for update;
+  if not found then raise exception 'Ordine non trovato'; end if;
+  if order_row.status='Da confermare' and p_status='Annullato' then
+    for item in select value from jsonb_array_elements(order_row.items) loop
+      select * into product_row from public.products where id=(item->>'product_id')::uuid for update;
+      if nullif(item->>'variant','') is not null then
+        idx:=null; variants_value:=product_row.variants;
+        for variant_row,idx in select value,ordinality-1 from jsonb_array_elements(variants_value) with ordinality loop
+          if variant_row->>'name'=item->>'variant' then exit; end if; idx:=null;
+        end loop;
+        if idx is not null then
+          variants_value:=jsonb_set(variants_value,array[idx::text,'stock'],to_jsonb((variant_row->>'stock')::integer+(item->>'quantity')::integer));
+          variants_value:=jsonb_set(variants_value,array[idx::text,'available'],'true'::jsonb);
+          update public.products set variants=variants_value where id=product_row.id;
+        end if;
+      else update public.products set stock=stock+(item->>'quantity')::integer,available=true where id=product_row.id;
+      end if;
+    end loop;
+  end if;
+  update public.orders set status=p_status where id=p_order_id;
+end; $$;
+revoke all on function public.set_order_status(uuid,text) from public, anon;
+grant execute on function public.set_order_status(uuid,text) to authenticated;
