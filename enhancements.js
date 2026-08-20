@@ -1,7 +1,7 @@
 const eremitaVariants = ['Labradorite Oro', 'Labradorite Argento', 'Selenite Oro', 'Selenite Argento', 'Ametista Oro', 'Ametista Argento', 'Occhio di Falco Oro', 'Occhio di Falco Argento', 'Occhio di Tigre Oro', 'Occhio di Tigre Argento', 'Malachite Oro', 'Malachite Argento', 'Quarzo Oro', 'Quarzo Argento', 'Avventurina Oro', 'Avventurina Argento', 'Acquamarina Oro', 'Acquamarina Argento', 'Turchese Oro', 'Turchese Argento', 'Ossidiana Dorata Oro', 'Ossidiana Dorata Argento'];
 
 document.addEventListener('click', event => {
-  const trigger = event.target.closest('[data-detail]'); const card = trigger?.closest('.product-card');
+  const trigger = event.target.closest('[data-detail], .add'); const card = trigger?.closest('.product-card');
   if (!card || !card.querySelector('.product-name')?.textContent.includes('Eremita')) return;
   event.preventDefault(); event.stopImmediatePropagation();
   const dialog = document.querySelector('#product-dialog'); const detail = document.querySelector('#product-detail');
