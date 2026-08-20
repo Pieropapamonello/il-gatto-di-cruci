@@ -15,3 +15,7 @@ Catalogo statico, responsive e pronto per Render. Il carrello prepara una richie
 - Colori e layout: modifica le variabili CSS all'inizio di `styles.css`.
 
 Le immagini attuali provengono dal catalogo Shop by Link. Prima di chiudere il vecchio servizio è consigliato scaricarle e sostituire gli URL con file nel repository, così il nuovo sito resta completamente indipendente.
+
+## Pannello amministratore
+
+L'area amministratore è disponibile in `/admin/`. Prima del primo accesso, apri il **SQL Editor** di Supabase, incolla ed esegui [`supabase/schema.sql`](supabase/schema.sql). Poi apri `/admin/` e crea l'account con email e password. Le policy RLS fanno sì che ogni account veda e modifichi soltanto i propri dati.
