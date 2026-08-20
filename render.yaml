@@ -6,3 +6,10 @@ services:
     autoDeployTrigger: commit
     buildCommand: ""
     staticPublishPath: .
+    headers:
+      - path: /admin
+        name: Cache-Control
+        value: no-store
+      - path: /admin/*
+        name: Cache-Control
+        value: no-store
