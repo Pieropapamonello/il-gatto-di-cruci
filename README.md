@@ -4,9 +4,9 @@ Catalogo statico, responsive e pronto per Render. Il carrello prepara una richie
 
 ## Pubblicazione su Render
 
-1. Crea un repository GitHub e carica questi file.
-2. In Render scegli **New > Static Site** e collega il repository.
-3. Imposta **Publish directory** su `.`; non serve alcun build command.
+1. In Render scegli **New > Blueprint** e collega il repository.
+2. Render rileva automaticamente `render.yaml`: seleziona il branch `main` e premi **Deploy Blueprint**.
+3. Da quel momento ogni push su `main` pubblica automaticamente la nuova versione del sito.
 
 ## Personalizzazioni
 
