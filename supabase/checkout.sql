@@ -46,13 +46,15 @@ begin
     select * into product_row from public.products
       where available = true
         and (
-          legacy_id = nullif(item->>'legacy_id','')::integer
+          (nullif(item->>'product_id','') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+            and id = (item->>'product_id')::uuid)
+          or legacy_id = nullif(item->>'legacy_id','')::integer
           or (
             nullif(trim(coalesce(item->>'product_name','')), '') is not null
             and lower(trim(name)) = lower(trim(item->>'product_name'))
           )
         )
-      order by case when legacy_id = nullif(item->>'legacy_id','')::integer then 0 else 1 end
+      order by case when nullif(item->>'product_id','') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' and id = (item->>'product_id')::uuid then 0 when legacy_id = nullif(item->>'legacy_id','')::integer then 1 else 2 end
       limit 1
       for update;
     if not found then raise exception 'Un prodotto non è più disponibile'; end if;
