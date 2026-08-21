@@ -442,6 +442,33 @@
     } catch (error) { content.innerHTML = `<h1>Ordini</h1>${notice(error.message, true)}`; }
   }
 
+  function orderDetail(order, back = ordersPage) {
+    if (!order) return back();
+    navigation('orders');
+    const state = orderState(order.status);
+    const pending = state === 'Da confermare';
+    const items = Array.isArray(order.items) ? order.items : [];
+    const articles = items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+    content.innerHTML = `<button class="back" id="back-orders">Indietro</button><div class="top product-title"><h1>Ordine ${escapeHtml(order.order_number || '#')}</h1><span class="detail-actions">${pending ? '<button id="confirm-detail-order">Conferma ordine</button><button class="ghost" id="cancel-detail-order">Annulla ordine</button>' : `<b class="status ${state === 'Annullato' ? 'status-cancelled' : ''}">${state}</b>`}</span></div><p class="muted">Ricevuto il ${date(order.created_at)}</p><section class="card"><h2>Riepilogo</h2><div class="list">${items.map(item => `<div class="row"><span>${item.image_url ? `<img src="${escapeHtml(item.image_url)}" alt="">` : 'Prodotto'}</span><span><strong>${escapeHtml(item.name)}</strong><p>${item.variant ? `Variante: ${escapeHtml(item.variant)} · ` : ''}${Number(item.quantity)} × ${money(item.price)}</p></span><b>${money(Number(item.price || 0) * Number(item.quantity || 0))}</b></div>`).join('') || '<p class="empty">Dettaglio articoli non disponibile.</p>'}</div><div class="order-totals"><p>Articoli <b>${money(articles)}</b></p><p>${escapeHtml(order.shipping_method || 'Spedizione')} <b>${money(order.shipping_price || Math.max(0, Number(order.total || 0) - articles))}</b></p><p><strong>Totale</strong> <strong>${money(order.total)}</strong></p></div></section><section class="card"><h2>Cliente</h2><p><strong>${escapeHtml(order.customer_name || '—')}</strong><br>${escapeHtml(order.customer_email || '—')}<br>${escapeHtml(order.customer_address || 'Indirizzo non indicato')}</p><p class="muted">${escapeHtml(order.payment_method || 'Pagamento manuale')}</p></section>`;
+    document.querySelector('#back-orders').addEventListener('click', back);
+    document.querySelector('#confirm-detail-order')?.addEventListener('click', () => updateOrderStatus(order, 'Approvato'));
+    document.querySelector('#cancel-detail-order')?.addEventListener('click', () => updateOrderStatus(order, 'Annullato'));
+  }
+
+  async function ordersPage() {
+    content.innerHTML = '<h1>Ordini</h1><p class="muted">Caricamento ordini...</p>';
+    try {
+      const orders = await api('orders?select=*&order=created_at.desc');
+      content.innerHTML = `<h1>Ordini</h1><div class="list">${orders.length ? orders.map(order => {
+        const state = orderState(order.status); const pending = state === 'Da confermare';
+        return `<div class="row order-row" data-order-open="${escapeHtml(order.id)}"><span>✓</span><span><strong>Ordine ${escapeHtml(order.order_number || '#')}</strong><p>${escapeHtml(order.customer_name || order.customer_email || '')} · ${date(order.created_at)} · <b class="status ${state === 'Annullato' ? 'status-cancelled' : ''}">${state}</b></p></span><span class="order-actions"><b>${money(order.total)}</b>${pending ? `<span><button class="confirm-order" data-order-id="${escapeHtml(order.id)}">Conferma</button><button class="ghost cancel-order" data-order-id="${escapeHtml(order.id)}">Annulla</button></span>` : ''}</span></div>`;
+      }).join('') : '<p class="empty">Non ci sono ancora ordini.</p>'}</div>`;
+      content.querySelectorAll('[data-order-open]').forEach(row => row.addEventListener('click', () => orderDetail(orders.find(order => order.id === row.dataset.orderOpen))));
+      content.querySelectorAll('.confirm-order').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); updateOrderStatus(orders.find(order => order.id === button.dataset.orderId), 'Approvato'); }));
+      content.querySelectorAll('.cancel-order').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); updateOrderStatus(orders.find(order => order.id === button.dataset.orderId), 'Annullato'); }));
+    } catch (error) { content.innerHTML = `<h1>Ordini</h1>${notice(error.message, true)}`; }
+  }
+
   async function paymentsPage() {
     content.innerHTML = '<h1>Incassi</h1><p class="muted">Caricamento incassi...</p>';
     try {
