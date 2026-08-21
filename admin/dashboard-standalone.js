@@ -45,6 +45,35 @@
     return [...values.entries()].map(([name, quantity]) => ({ name, stock: quantity, available: quantity > 0 }));
   }
 
+  const SHOPBYLINK_VARIANTS = {
+    'Bracciali Chips Piete Naturali (vari) con Elastico': ['Ossidiana', 'Lepidolite', 'Ametista', 'Giada', 'Amazonite'],
+    'Ciondoli Tormalina Varie (catenina acciaio inclusa)': ['Punta', 'Cabochon'],
+    'Disco Selenite 1pz(varie) 10cm': ['Albero', 'Ciclo Luna'],
+    'Orecchini Singoli (vari)': ['Orecchino – Ossidiana Oro', 'Orecchino – Fluorite', 'Orecchino – Avventurina & Quarzo Rosa', 'Orecchino – Granato'],
+    'Pendenti a Goccia Vari (catenina acciaio inclusa)': ['ametista', 'ametista bagno argento', 'quarzo tormalinato bagno argento', 'quarzo rosa bagno argento'],
+    'Pendolo in pietra naturale (varie)': ['rubino con zoisite', 'lepidolite', 'ametista', 'angelite', 'quarzo rosa'],
+    'L’Eremita – Collane Essenziali (varie-scorri le foto)': ['Labradorite Oro', 'Labradorite Argento', 'Selenite Oro', 'Selenite Argento', 'Ametista Oro', 'Ametista Argento', 'Occhio di Falco Oro', 'Occhio di Falco Argento', 'Occhio Di Tigre Oro', 'Occhio di Tigre Argento', 'Malachite Oro', 'Malachite Argento', 'Quarzo Oro', 'Quarzo Argento', 'Avventurina Oro', 'Avventurina Argento', 'Acquamarina Oro', 'Acquamarina Argento', 'Turchese Oro', 'Turchese Argento', 'Ossidiana Dorata Oro', 'Ossidiana Dorata Argento'],
+  };
+  const comparableName = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('it-IT').replace(/[^\p{L}\p{N}]+/gu, '');
+
+  async function seedShopByLinkVariants() {
+    const seeds = Object.entries(SHOPBYLINK_VARIANTS);
+    if (!confirm(`Saranno configurate ${seeds.length} famiglie di varianti da ShopByLink. Ogni variante inizierà con quantità 1. Le varianti già configurate non verranno modificate. Continuare?`)) return;
+    try {
+      const products = await api('products?select=*&order=created_at.desc');
+      let updated = 0;
+      for (const [name, choices] of seeds) {
+        const target = products.find(product => comparableName(product.name) === comparableName(name));
+        if (!target || (Array.isArray(target.variants) && target.variants.length)) continue;
+        const variants = choices.map(choice => ({ name: choice, stock: 1, available: true }));
+        await api(`products?id=eq.${encodeURIComponent(target.id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ variants, stock: variants.length, available: true }) });
+        updated++;
+      }
+      alert(updated ? `Varianti configurate per ${updated} prodotti. Ora puoi modificare le quantità una per una.` : 'Nessun prodotto da aggiornare: le varianti sono già configurate o il prodotto non è presente nel database.');
+      productsPage();
+    } catch (error) { alert(`Non è stato possibile configurare le varianti: ${error.message}`); }
+  }
+
   async function removeDuplicateProducts(groups) {
     const names = groups.map(group => `${group[0].name} (${group.length} copie)`).join('\n');
     if (!confirm(`Saranno uniti questi prodotti duplicati:\n\n${names}\n\nVerrà mantenuta una sola scheda per prodotto e le quantità saranno sommate. Continuare?`)) return;
@@ -172,6 +201,11 @@
         list.innerHTML = filtered.length ? filtered.map(productRow).join('') : '<p class="empty">Nessun prodotto trovato.</p>';
         list.querySelectorAll('[data-product-id]').forEach(row => row.addEventListener('click', () => productDetail(productsCache.find(product => product.id === row.dataset.productId))));
       };
+      const seedVariantsButton = document.createElement('button');
+      seedVariantsButton.type = 'button'; seedVariantsButton.className = 'ghost'; seedVariantsButton.id = 'seed-variants';
+      seedVariantsButton.textContent = 'Configura varianti ShopByLink';
+      content.querySelector('#new-product').before(seedVariantsButton);
+      seedVariantsButton.addEventListener('click', seedShopByLinkVariants);
       content.querySelector('#new-product').addEventListener('click', () => productEditor());
       content.querySelector('#clean-duplicates')?.addEventListener('click', () => removeDuplicateProducts(duplicateGroups));
       search.addEventListener('input', event => draw(event.target.value));
