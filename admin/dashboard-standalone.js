@@ -492,7 +492,8 @@
   }
 
   async function updateOrderStatus(order, status) {
-    const action = status === 'Approvato' ? 'confermare' : 'annullare';
+    const actions = { Approvato: 'confermare', Annullato: 'annullare', 'In lavorazione': 'mettere in lavorazione', Completato: 'segnare come completato' };
+    const action = actions[status] || 'aggiornare';
     if (!confirm(`Vuoi ${action} l'ordine ${order.order_number || ''}?`)) return;
     try {
       await api('rpc/set_order_status', { method: 'POST', body: JSON.stringify({ p_order_id: order.id, p_status: status }) });
@@ -525,6 +526,16 @@
     document.querySelector('#back-orders').addEventListener('click', back);
     document.querySelector('#confirm-detail-order')?.addEventListener('click', () => updateOrderStatus(order, 'Approvato'));
     document.querySelector('#cancel-detail-order')?.addEventListener('click', () => updateOrderStatus(order, 'Annullato'));
+    if (state !== 'Annullato' && state !== 'Completato') {
+      const actions = content.querySelector('.detail-actions');
+      const working = document.createElement('button');
+      working.type = 'button'; working.className = 'ghost'; working.textContent = 'In lavorazione';
+      const completed = document.createElement('button');
+      completed.type = 'button'; completed.className = 'ghost'; completed.textContent = 'Completato';
+      actions.append(working, completed);
+      working.addEventListener('click', () => updateOrderStatus(order, 'In lavorazione'));
+      completed.addEventListener('click', () => updateOrderStatus(order, 'Completato'));
+    }
   }
 
   async function ordersPage() {
