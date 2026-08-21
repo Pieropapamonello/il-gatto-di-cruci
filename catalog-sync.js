@@ -64,7 +64,10 @@ async function loadCatalogFromSupabase() {
     if (!Array.isArray(rows)) throw new Error('Formato catalogo non valido');
     const fallback = [...products];
     const mapped = rows.map(row => {
-      const old = fallback.find(product => Number(product.id) === Number(row.legacy_id) || catalogNormalise(product.name) === catalogNormalise(row.name));
+      // A missing legacy id must never be converted to 0: otherwise every imported
+      // product would inherit the image of the first old catalogue entry.
+      const hasLegacyId = row.legacy_id !== null && row.legacy_id !== undefined && row.legacy_id !== '';
+      const old = fallback.find(product => (hasLegacyId && Number(product.id) === Number(row.legacy_id)) || catalogNormalise(product.name) === catalogNormalise(row.name));
       const variants = Array.isArray(row.variants) ? row.variants : [];
       const image = row.image_url || old?.image || old?.images?.[0] || '';
       return { id: row.id, legacyId: row.legacy_id, name: row.name, description: row.description || old?.description || '', price: Number(row.price), stock: Number(row.stock || 0), variants, image, images: old?.images?.length ? old.images : (image ? [image] : []), category: old?.category || categoryFromName(row.name), tag: old?.tag || '', available: Boolean(row.available) };
