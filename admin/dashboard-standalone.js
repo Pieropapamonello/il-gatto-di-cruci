@@ -188,12 +188,13 @@
     if (!product) return productsPage();
     navigation('products');
     const quantity = stock(product);
+    const likelyVariantProduct = /\bvari(?:e|anti)?\b/i.test(product.name || '') && (!Array.isArray(product.variants) || !product.variants.length);
     content.innerHTML = `<button class="back" id="back-products">← Prodotti</button>
       <div class="top product-title"><h1>${escapeHtml(product.name)}</h1><span class="detail-actions"><button class="ghost" id="edit-product">Modifica</button><button class="ghost" id="duplicate-product">Duplica</button><button id="delete-product">Elimina</button></span></div>
       <section class="product-detail">
         ${product.image_url ? `<img class="detail-image" src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.name)}">` : ''}
         <div class="detail-info"><p><span>Descrizione</span><strong>${escapeHtml(product.description || 'Nessuna descrizione')}</strong></p><p><span>Prezzo</span><strong>${money(product.price)}</strong></p><p><span>Quantita totale</span><strong>${quantity}</strong></p><p><span>Stato</span><strong>${product.available !== false && quantity > 0 ? 'Disponibile' : 'Esaurito'}</strong></p></div>
-      </section><h2>Varianti</h2>${variantsTable(product.variants)}`;
+      </section>${likelyVariantProduct ? '<p class="error-message">Questo prodotto sembra avere varianti, ma non sono ancora state salvate. Premi Modifica e inserisci una riga “nome | quantità” per ogni scelta vendibile.</p>' : ''}<h2>Varianti</h2>${variantsTable(product.variants)}`;
     document.querySelector('#back-products').addEventListener('click', productsPage);
     document.querySelector('#edit-product').addEventListener('click', () => productEditor(product));
     document.querySelector('#duplicate-product').addEventListener('click', () => productEditor({ ...product, id: null, name: `${product.name} (copia)` }));
