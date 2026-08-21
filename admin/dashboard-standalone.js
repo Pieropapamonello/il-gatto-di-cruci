@@ -201,11 +201,18 @@
   }
 
   function parseVariants(raw) {
-    return raw.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+    const merged = new Map();
+    raw.split('\n').map(line => line.trim()).filter(Boolean).forEach(line => {
       const parts = line.split('|');
+      const name = parts[0].trim();
       const quantity = Math.max(0, Number(parts.slice(1).join('|').trim() || 0));
-      return { name: parts[0].trim(), stock: quantity, available: quantity > 0 };
-    }).filter(variant => variant.name);
+      if (!name) return;
+      const key = name.toLocaleLowerCase('it-IT');
+      const current = merged.get(key) || { name, stock: 0 };
+      current.stock += quantity;
+      merged.set(key, current);
+    });
+    return [...merged.values()].map(variant => ({ ...variant, available: variant.stock > 0 }));
   }
 
   function productEditor(product = null) {
