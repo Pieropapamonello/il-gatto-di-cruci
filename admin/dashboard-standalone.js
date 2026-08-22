@@ -273,11 +273,13 @@
     raw.split('\n').map(line => line.trim()).filter(Boolean).forEach(line => {
       const parts = line.split('|');
       const name = parts[0].trim();
-      const quantity = Math.max(0, Number(parts.slice(1).join('|').trim() || 0));
+      const quantity = Math.max(0, Number(parts[1]?.trim() || 0));
+      const image = String(parts.slice(2).join('|') || '').trim();
       if (!name) return;
       const key = name.toLocaleLowerCase('it-IT');
       const current = merged.get(key) || { name, stock: 0 };
       current.stock += quantity;
+      if (/^https?:\/\//i.test(image)) current.image = image;
       merged.set(key, current);
     });
     return [...merged.values()].map(variant => ({ ...variant, available: variant.stock > 0 }));
@@ -285,7 +287,7 @@
 
   function productEditor(product = null) {
     const creating = !product?.id;
-    const variants = Array.isArray(product?.variants) ? product.variants.map(variant => `${variant.name} | ${variant.stock ?? 0}`).join('\n') : '';
+    const variants = Array.isArray(product?.variants) ? product.variants.map(variant => `${variant.name} | ${variant.stock ?? 0}${variant.image ? ` | ${variant.image}` : ''}`).join('\n') : '';
     navigation('products');
     content.innerHTML = `<button class="back" id="cancel-edit">← Prodotti</button><div class="top"><h1>${creating ? 'Nuovo prodotto' : 'Modifica prodotto'}</h1></div>
       <form id="product-form" class="editor-form"><div class="form-grid">
@@ -303,6 +305,7 @@
         </label>
         <label class="wide">Oppure URL foto principale<input id="image-url" type="url" placeholder="https://..." value="${escapeHtml(product?.image_url || '')}"></label>
         <label class="wide">Varianti (una per riga: nome | quantita)<textarea id="variants" rows="7" placeholder="Occhio di Falco Oro | 2&#10;Quarzo Oro | 3">${escapeHtml(variants)}</textarea><small>Ogni riga e una scelta acquistabile separata. Scrivi il nome esattamente come compare nel menu del negozio, per esempio: <b>Occhio di Falco Oro | 2</b> e <b>Quarzo Oro | 3</b>. Se inserisci varianti, la disponibilita totale e calcolata soltanto dalla somma delle loro quantita; il campo “Quantita senza varianti” viene ignorato.</small></label>
+        <p class="wide muted">Puoi anche aggiungere una foto alla variante: dopo quantità scrivi <b>| URL foto</b>, per esempio <b>Occhio di Falco Oro | 2 | https://...</b>.</p>
         <label class="check wide"><input id="available" type="checkbox" ${product?.available !== false ? 'checked' : ''}> Prodotto visibile e ordinabile</label>
       </div><p id="form-message" class="error-message"></p><div class="actions"><button type="button" class="ghost" id="cancel-edit-2">Annulla</button><button type="submit">${creating ? 'Crea prodotto' : 'Salva modifiche'}</button></div></form>`;
     const cancel = () => creating ? productsPage() : productDetail(product);
