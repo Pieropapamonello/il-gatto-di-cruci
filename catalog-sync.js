@@ -22,6 +22,10 @@ const categoryFromName = name => {
 const catalogProduct = id => products.find(product => String(product.id) === String(id));
 const availableVariants = product => (Array.isArray(product?.variants) ? product.variants : []).filter(variant => Number(variant.stock || 0) > 0 && variant.available !== false);
 
+// app.js initially attaches the search field to the embedded catalogue.  Replace
+// that listener so search results and product details always use Supabase IDs.
+search.oninput = () => renderProducts();
+
 renderFilters = () => {
   const categories = ['Tutti', ...new Set(products.map(product => product.category).filter(Boolean))];
   if (!categories.includes(activeCategory)) activeCategory = 'Tutti';
@@ -37,8 +41,15 @@ renderProducts = () => {
     const picture = product.image || product.images?.[0] || '';
     return `<article class="product-card"><div class="product-image" data-detail="${catalogEscape(product.id)}">${picture ? `<img src="${catalogEscape(picture)}" alt="${catalogEscape(product.name)}" loading="lazy" />` : '<span aria-hidden="true">◇</span>'}${product.tag ? `<span class="tag">${catalogEscape(product.tag)}</span>` : ''}</div><div class="product-meta"><span class="product-category">${catalogEscape(product.category)}</span><h3 class="product-name" data-detail="${catalogEscape(product.id)}">${catalogEscape(product.name)}</h3><div class="product-bottom"><span><strong class="product-price">${formatPrice(product)}</strong><br><small class="availability">${orderable ? 'Disponibile' : 'Esaurito'}</small></span><button class="add" data-id="${catalogEscape(product.id)}" ${orderable ? '' : 'disabled'}>${product.variants?.length ? 'Scegli' : 'Aggiungi'}</button></div></div></article>`;
   }).join('') || '<p>Nessun prodotto trovato.</p>';
-  grid.querySelectorAll('.add').forEach(button => button.onclick = () => openDetail(button.dataset.id));
-  grid.querySelectorAll('[data-detail]').forEach(element => element.onclick = () => openDetail(element.dataset.detail));
+  // Delegation also works reliably on mobile after the product list is rebuilt.
+  grid.onclick = event => {
+    const target = event.target.closest('.add[data-id], [data-detail]');
+    if (!target || !grid.contains(target)) return;
+    const id = target.dataset.id || target.dataset.detail;
+    if (!id) return;
+    event.preventDefault();
+    openDetail(id);
+  };
 };
 
 openDetail = id => {
